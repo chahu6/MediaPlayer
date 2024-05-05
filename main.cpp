@@ -31,7 +31,12 @@ void initLogger(const QString& logDir)
 
 int main(int argc, char *argv[])
 {
-// 适配高分辨率
+    QCoreApplication::setOrganizationName("Chahu666");
+    QCoreApplication::setOrganizationDomain("https://gitee.com/chahu666");
+    QCoreApplication::setApplicationName("MediaPlayer");
+    QCoreApplication::setApplicationVersion("1.0");
+
+    // 适配高分辨率
 #if(QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Floor);
 #elif(QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
@@ -44,7 +49,10 @@ int main(int argc, char *argv[])
     // 初始化日志库，必须在QApplication初始化之后，不然QApplication::applicationDirPath()没有值
     QString logDir = QApplication::applicationDirPath() + "/logs";
     initLogger(logDir);
-    QLOG_INFO() << "初始化日志库成功";
+
+    QString vInfo = QString("%1 V%2").arg(QCoreApplication::applicationName()).arg(QCoreApplication::applicationVersion());
+    qDebug() << vInfo;
+    QLOG_INFO() << vInfo;
 
     Widget w;
     w.show();

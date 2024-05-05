@@ -1,7 +1,7 @@
 HEADERS += \
-    # $$PWD/Player.h
+    $$PWD/AVPlayer.h
 
 SOURCES += \
-    # $$PWD/Player.cpp
+    $$PWD/AVPlayer.cpp
 
 INCLUDEPATH += Player
