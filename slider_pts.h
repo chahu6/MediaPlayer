@@ -9,6 +9,13 @@ class AVPtsSlider : public QSlider
 public:
     AVPtsSlider(QWidget* parent = Q_NULLPTR);
     ~AVPtsSlider();
+
+    void setPtsPercent(double percent);
+
+protected:
+
+private:
+    double m_percent;
 };
 
 #endif // AVPTSSLIDER_H

@@ -19,8 +19,13 @@ HEADERS += \
     slider_pts.h \
     widget.h
 
+RESOURCES += \
+     res.qrc
+
 FORMS += \
     widget.ui
+
+RC_ICONS = logo.ico # 配置桌面软件和的图标
 
 include(3rdparty/3rdparty.pri)
 include(Player/Player.pri)

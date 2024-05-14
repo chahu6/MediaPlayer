@@ -63,18 +63,37 @@ namespace AVTool
         ~Decoder();
 
         bool decode(const QString& url);
+        void exit();
+
+        int getAFrame(AVFrame* frame);
+
+        int getRemainingVFrame();
+        // 查看上一帧（即当前显示的画面帧）
+        FFrame* peekLastVFrame();
+        // 查看将要显示的帧
+        FFrame* peekVFrame();
+        // 查看将要显示帧的下一帧
+        FFrame* peekNextVFrame();
+        // 将读索引后移一位
+        void setNextVFrame();
 
     private:
         void init();
 
-        void exit();
-
         void setInitVal();
 
-        void demux();
+        void clearQueueCache();
 
+        void demux();
         void audioDecode();
         void videoDecode();
+
+        void pushPacket(FPacketQueue* queue, AVPacket* pkt);
+        int getPacket(FPacketQueue* queue, AVPacket* pkt, FPktDecoder* decoder);
+
+        void pushAFrame(AVFrame* frame);
+
+        void pushVFrame(AVFrame* frame);
 
     private:
         FPacketQueue m_audioPacketQueue;
@@ -97,8 +116,8 @@ namespace AVTool
 
         AVRational m_vidFrameRate;
 
-        uint32_t m_audioIndex = -1; // 音频流索引值
-        uint32_t m_videoIndex = -1; // 视频流索引值
+        int m_audioIndex = -1; // 音频流索引值
+        int m_videoIndex = -1; // 视频流索引值
 
         //是否执行跳转
         int m_isSeek;
@@ -115,6 +134,16 @@ namespace AVTool
 
         //流总时长/S
         uint32_t m_duration;
+
+    public:
+        inline uint32_t duration() const { return m_duration; }
+        inline AVCodecParameters* audioCodecPar() const { return m_pAvFormatCtx->streams[m_audioIndex]->codecpar; }
+        inline AVCodecParameters* videoCodecPar() const { return m_pAvFormatCtx->streams[m_videoIndex]->codecpar; }
+        inline int audioIndex() const { return m_audioIndex; }
+        inline int videoIndex() const { return m_videoIndex; }
+        inline AVFormatContext* formatContext() const { return m_pAvFormatCtx; }
+        inline bool isExit() const { return m_exit.load(); }
+        inline int vidPktSerial() const { return m_videoPacketQueue.serial; }
     };
 }
 

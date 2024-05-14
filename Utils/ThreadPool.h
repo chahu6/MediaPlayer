@@ -53,7 +53,7 @@ private:
     ThreadPool(unsigned int number = std::thread::hardware_concurrency())
         :stop_(false)
     {
-        thread_num_ = number <= 1 ? 2 : number;
+        thread_num_ = number <= 6 ? 6 : number;
 
         start();
     }

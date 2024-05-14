@@ -6,11 +6,11 @@
 AVTool::Decoder::Decoder()
     : m_maxFrameQueueSize(16),
       m_maxPacketQueueSize(30),
-      m_videoIndex(-1),
-      m_audioIndex(-1),
-      m_duration(0),
       m_pAvFormatCtx(nullptr),
-      m_exit(0)
+      m_exit(0),
+      m_audioIndex(-1),
+      m_videoIndex(-1),
+      m_duration(0)
 {
     init();
 }
@@ -181,6 +181,21 @@ void AVTool::Decoder::init()
 void AVTool::Decoder::exit()
 {
     m_exit.store(true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    clearQueueCache();
+    if(m_pAvFormatCtx)
+    {
+        avformat_close_input(&m_pAvFormatCtx);
+        m_pAvFormatCtx = nullptr;
+    }
+    if(m_audioPktDecoder.codecCtx) {
+        avcodec_free_context(&m_audioPktDecoder.codecCtx);
+        m_audioPktDecoder.codecCtx=nullptr;
+    }
+    if(m_videoPktDecoder.codecCtx) {
+        avcodec_free_context(&m_videoPktDecoder.codecCtx);
+        m_videoPktDecoder.codecCtx=nullptr;
+    }
 }
 
 void AVTool::Decoder::setInitVal()
@@ -216,6 +231,45 @@ void AVTool::Decoder::setInitVal()
     m_videoPktDecoder.serial=0;
 }
 
+void AVTool::Decoder::clearQueueCache()
+{
+    {
+        std::lock_guard<std::mutex> lockAP(m_audioPacketQueue.mutex);
+        std::lock_guard<std::mutex> lockVP(m_videoPacketQueue.mutex);
+
+        while(m_audioPacketQueue.size)
+        {
+            av_packet_unref(&m_audioPacketQueue.pktVec[m_audioPacketQueue.readIndex].pkt);
+            m_audioPacketQueue.readIndex = (m_audioPacketQueue.readIndex + 1) % m_maxPacketQueueSize;
+            m_audioPacketQueue.size--;
+        }
+
+        while(m_videoPacketQueue.size)
+        {
+            av_packet_unref(&m_videoPacketQueue.pktVec[m_videoPacketQueue.readIndex].pkt);
+            m_videoPacketQueue.readIndex = (m_videoPacketQueue.readIndex + 1) % m_maxPacketQueueSize;
+            m_videoPacketQueue.size--;
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lockAF(m_audioFrameQueue.mutex);
+        std::lock_guard<std::mutex> lockVF(m_videoFrameQueue.mutex);
+
+        while(m_audioFrameQueue.size) {
+            av_frame_unref(&m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
+            m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+            m_audioFrameQueue.size--;
+        }
+
+        while(m_videoFrameQueue.size) {
+            av_frame_unref(&m_videoFrameQueue.frameVec[m_videoFrameQueue.readIndex].frame);
+            m_videoFrameQueue.readIndex=(m_videoFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+            m_videoFrameQueue.size--;
+        }
+    }
+}
+
 void AVTool::Decoder::demux()
 {
     int ret = -1;
@@ -233,11 +287,51 @@ void AVTool::Decoder::demux()
         {
 
         }
+
+        // 读取音视频数据包进行解码处理
+        ret = av_read_frame(m_pAvFormatCtx, pkt);
+        if (ret == AVERROR_EOF)  // 正常读取到文件尾部退出
+        {
+            av_packet_free(&pkt);
+            QLOG_INFO() << "已到达媒体文件结尾";
+            break;
+        }
+        else if(ret < 0)
+        {
+            av_packet_free(&pkt);
+            av_strerror(ret, m_errBuf, sizeof(m_errBuf));
+            QLOG_ERROR() << "av_read_frame error: " << m_errBuf;
+            break;
+        }
+        // 读取到音频包
+        if(pkt->stream_index == m_audioIndex)
+        {
+            // 插入音频包队列
+            pushPacket(&m_audioPacketQueue, pkt);
+        }
+        else if(pkt->stream_index == m_videoIndex)
+        {
+            pushPacket(&m_videoPacketQueue, pkt);
+        }
+        else
+        {
+            av_packet_unref(pkt);
+        }
     }
+    av_packet_free(&pkt);
+    if(!m_exit.load())
+    {
+        while(m_audioFrameQueue.size)
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        exit();
+    }
+    QLOG_INFO() << "demuxThread exit";
 }
 
 void AVTool::Decoder::audioDecode()
 {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     AVPacket* pkt = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
     while(true)
@@ -246,12 +340,241 @@ void AVTool::Decoder::audioDecode()
         // 音频帧队列长度控制
         if(m_audioFrameQueue.size >= m_maxFrameQueueSize)
         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
 
+        // 从音频包队列取音频包
+        int ret = getPacket(&m_audioPacketQueue, pkt, &m_audioPktDecoder);
+        if(ret)
+        {
+            ret = avcodec_send_packet(m_audioPktDecoder.codecCtx, pkt);
+            av_packet_unref(pkt);
+            if(ret < 0)
+            {
+                av_strerror(ret, m_errBuf, sizeof(m_errBuf));
+                QLOG_ERROR() << "avcodec_send_packet error: " << m_errBuf;
+                continue;
+            }
+            while(true)
+            {
+                ret = avcodec_receive_frame(m_audioPktDecoder.codecCtx, frame);
+                if(ret == 0)
+                {
+                    if(m_audSeek)
+                    {
+
+                    }
+                    // 添加到待播放视频帧队列
+                    pushAFrame(frame);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
     }
+    av_packet_free(&pkt);
+    av_frame_free(&frame);
+    QLOG_INFO() << "audioDecode exit";
 }
 
 void AVTool::Decoder::videoDecode()
 {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+    AVPacket* pkt = av_packet_alloc();
+    AVFrame* frame = av_frame_alloc();
+    while(true)
+    {
+        if(m_exit.load()) break;
+        if(m_videoFrameQueue.size >= m_maxFrameQueueSize)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+        int ret = getPacket(&m_videoPacketQueue, pkt, &m_videoPktDecoder);
+        if(ret)
+        {
+            ret = avcodec_send_packet(m_videoPktDecoder.codecCtx, pkt);
+            av_packet_unref(pkt);
+            if(ret < 0 || ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+            {
+                av_strerror(ret, m_errBuf, sizeof(m_errBuf));
+                QLOG_ERROR() << "avcodec_send_packet error: " << m_errBuf;
+                continue;
+            }
+            while(true)
+            {
+                ret = avcodec_receive_frame(m_videoPktDecoder.codecCtx, frame);
+                if(ret == 0)
+                {
+                    if(m_vidSeek)
+                    {
+
+                    }
+                    // 添加到带播放视频帧队列
+                    pushVFrame(frame);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
+    av_packet_free(&pkt);
+    av_frame_free(&frame);
+    QLOG_INFO() << "videoDecode exit";
+}
+
+void AVTool::Decoder::pushPacket(FPacketQueue *queue, AVPacket *pkt)
+{
+    std::lock_guard<std::mutex> lock(queue->mutex);
+    av_packet_move_ref(&queue->pktVec[queue->pushIndex].pkt, pkt);
+    queue->pktVec[queue->pushIndex].serial = queue->serial;
+    queue->pushIndex = (queue->pushIndex + 1) % m_maxPacketQueueSize;
+    queue->size++;
+}
+
+int AVTool::Decoder::getPacket(FPacketQueue *queue, AVPacket *pkt, FPktDecoder *decoder)
+{
+    std::unique_lock<std::mutex> lock(queue->mutex);
+    while(!queue->size)
+    {
+        bool ret = queue->cond.wait_for(lock, std::chrono::milliseconds(100), [&](){
+            return queue->size > 0;
+        });
+        if(!ret)
+            return 0;
+    }
+
+    if(queue->serial != decoder->serial)
+    {
+        // 序列号不连续的帧证明发生了跳转操作则直接丢弃
+        // 并清空解码器缓存
+        avcodec_flush_buffers(decoder->codecCtx);
+        decoder->serial = queue->pktVec[queue->readIndex].serial;
+        return 0;
+    }
+    av_packet_move_ref(pkt, &queue->pktVec[queue->readIndex].pkt);
+    decoder->serial = queue->pktVec[queue->readIndex].serial;
+    queue->readIndex = (queue->readIndex + 1) % m_maxPacketQueueSize;
+    queue->size--;
+
+    return 1;
+}
+
+void AVTool::Decoder::pushAFrame(AVFrame *frame)
+{
+    std::lock_guard<std::mutex> lock(m_audioFrameQueue.mutex);
+    av_frame_move_ref(&m_audioFrameQueue.frameVec[m_audioFrameQueue.pushIndex].frame, frame);
+    m_audioFrameQueue.frameVec[m_audioFrameQueue.pushIndex].serial = m_audioPktDecoder.serial;
+    m_audioFrameQueue.pushIndex = (m_audioFrameQueue.pushIndex + 1) % m_maxFrameQueueSize;
+    m_audioFrameQueue.size++;
+}
+
+void AVTool::Decoder::pushVFrame(AVFrame *frame)
+{
+    std::lock_guard<std::mutex> lock(m_videoFrameQueue.mutex);
+    m_videoFrameQueue.frameVec[m_videoFrameQueue.pushIndex].serial = m_videoPktDecoder.serial;
+    m_videoFrameQueue.frameVec[m_videoFrameQueue.pushIndex].duration = m_vidFrameRate.den && m_vidFrameRate.num ? av_q2d(AVRational{m_vidFrameRate.den, m_vidFrameRate.num}) : 0.00;
+    m_videoFrameQueue.frameVec[m_videoFrameQueue.pushIndex].pts = frame->pts * av_q2d(m_pAvFormatCtx->streams[m_videoIndex]->time_base);
+    av_frame_move_ref(&m_videoFrameQueue.frameVec[m_videoFrameQueue.pushIndex].frame, frame);
+    m_videoFrameQueue.pushIndex = (m_videoFrameQueue.pushIndex + 1) % m_maxFrameQueueSize;
+    m_videoFrameQueue.size++;
+}
+
+int AVTool::Decoder::getAFrame(AVFrame *frame)
+{
+    if(!frame) return 0;
+    std::unique_lock<std::mutex> lock(m_audioFrameQueue.mutex);
+    while(!m_audioFrameQueue.size) {
+        bool ret=m_audioFrameQueue.cond.wait_for(lock,std::chrono::milliseconds(100),
+                                                   [&](){return !m_exit && m_audioFrameQueue.size;});
+        if(!ret)
+            return 0;
+    }
+    if(m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].serial != m_audioPacketQueue.serial) {
+        av_frame_unref(&m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
+        m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+        m_audioFrameQueue.size--;
+        return 0;
+    }
+    av_frame_move_ref(frame, &m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
+    m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+    m_audioFrameQueue.size--;
+    return 1;
+}
+
+int AVTool::Decoder::getRemainingVFrame()
+{
+    std::unique_lock<std::mutex> lock(m_videoFrameQueue.mutex);
+    if(!m_videoFrameQueue.size)
+    {
+        return 0;
+    }
+    return m_videoFrameQueue.size - m_videoFrameQueue.shown;
+}
+
+AVTool::Decoder::FFrame *AVTool::Decoder::peekLastVFrame()
+{
+    FFrame* frame = &m_videoFrameQueue.frameVec[m_videoFrameQueue.readIndex];
+    return frame;
+}
+
+AVTool::Decoder::FFrame *AVTool::Decoder::peekVFrame()
+{
+    while(!m_videoFrameQueue.size)
+    {
+        std::unique_lock<std::mutex> lock(m_videoFrameQueue.mutex);
+        bool ret = m_videoFrameQueue.cond.wait_for(lock, std::chrono::milliseconds(100),
+                                                   [&](){ return !m_exit.load() && m_videoFrameQueue.size; });
+        if(!ret)
+            return nullptr;
+    }
+    int index = (m_videoFrameQueue.readIndex + m_videoFrameQueue.shown) % m_maxFrameQueueSize;
+    FFrame* frame = &m_videoFrameQueue.frameVec[index];
+    return frame;
+}
+
+AVTool::Decoder::FFrame *AVTool::Decoder::peekNextVFrame()
+{
+    while(m_videoFrameQueue.size < 2)
+    {
+        std::unique_lock<std::mutex> lock(m_videoFrameQueue.mutex);
+        bool ret = m_videoFrameQueue.cond.wait_for(lock, std::chrono::milliseconds(100),
+                                                   [&](){ return !m_exit.load() && m_videoFrameQueue.size; });
+        if(!ret)
+            return nullptr;
+    }
+    int index = (m_videoFrameQueue.readIndex + m_videoFrameQueue.shown + 1) % m_maxFrameQueueSize;
+    FFrame* frame = &m_videoFrameQueue.frameVec[index];
+    return frame;
+}
+
+void AVTool::Decoder::setNextVFrame()
+{
+    std::unique_lock<std::mutex> lock(m_videoFrameQueue.mutex);
+    if(!m_videoFrameQueue.size)
+    {
+        return;
+    }
+    if(!m_videoFrameQueue.shown)
+    {
+        m_videoFrameQueue.shown = 1;
+        return;
+    }
+    av_frame_unref(&m_videoFrameQueue.frameVec[m_videoFrameQueue.readIndex].frame);
+    m_videoFrameQueue.readIndex = (m_videoFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
+    m_videoFrameQueue.size--;
 }

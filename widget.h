@@ -34,6 +34,10 @@ private:
 
     const QString m_vFmt;
 
+    unsigned int m_duration;
+
+    bool m_ptsSliderPressed;
+
 private Q_SLOTS:
     void pauseOnBtnClickSlot();
 
@@ -41,9 +45,9 @@ private Q_SLOTS:
 
     void setVolume(int volume);
 
-    void ptsChangedSlot(unsigned int duration);
+    void ptsChangedSlot(unsigned int pts);
 
-    void durationChangedSlot(unsigned int pts);
+    void durationChangedSlot(unsigned int duration);
 
     void terminateSlot();
 

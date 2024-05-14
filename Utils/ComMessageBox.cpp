@@ -29,11 +29,11 @@ ComMessageBox::ComMessageBox(bool success, const QString& text, QWidget* parent)
     QString filename;
     if(success)
     {
-        filename = ":/images/icon/success.png";
+        filename = ":/res/images/icon/success.png";
     }
     else
     {
-        filename = ":/images/icon/error.png";
+        filename = ":/res/images/icon/error.png";
     }
 
     QLabel* iconLabel = new QLabel(this);
@@ -55,7 +55,7 @@ ComMessageBox::ComMessageBox(bool success, const QString& text, QWidget* parent)
 
 void ComMessageBox::success(QWidget* parent, const QString& text)
 {
-    ComMessageBox mb(true,text,parent);
+    ComMessageBox mb(true, text, parent);
     mb.exec();
 }
 

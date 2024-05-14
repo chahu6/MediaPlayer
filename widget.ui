@@ -414,7 +414,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QSlider" name="horizontalSlider">
+      <widget class="QSlider" name="slider_volume">
        <property name="minimumSize">
         <size>
          <width>150</width>
