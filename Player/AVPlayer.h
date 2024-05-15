@@ -74,8 +74,9 @@ public:
 
     AVPlayer::EPlayerState playeState();
 
-private:
     void clearPlayer();
+
+private:
     int initSDL();
     void initVideo();
 

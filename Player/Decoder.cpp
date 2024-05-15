@@ -13,7 +13,6 @@ AVTool::Decoder::Decoder()
       m_duration(0)
 {
     init();
-    setInitVal();
 }
 
 AVTool::Decoder::~Decoder()
@@ -23,6 +22,8 @@ AVTool::Decoder::~Decoder()
 
 bool AVTool::Decoder::decode(const QString &url)
 {
+    setInitVal(); // 初始化数据
+
     int ret = 0;
     // 解封装初始化
     m_pAvFormatCtx = avformat_alloc_context();
@@ -392,8 +393,6 @@ void AVTool::Decoder::audioDecode()
 
 void AVTool::Decoder::videoDecode()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
     AVPacket* pkt = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
     while(true)
@@ -505,7 +504,7 @@ int AVTool::Decoder::getAFrame(AVFrame *frame)
     if(!frame) return 0;
     std::unique_lock<std::mutex> lock(m_audioFrameQueue.mutex);
     while(!m_audioFrameQueue.size) {
-        bool ret=m_audioFrameQueue.cond.wait_for(lock,std::chrono::milliseconds(100),
+        bool ret = m_audioFrameQueue.cond.wait_for(lock,std::chrono::milliseconds(100),
                                                    [&](){return !m_exit && m_audioFrameQueue.size;});
         if(!ret)
             return 0;

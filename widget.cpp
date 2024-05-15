@@ -52,6 +52,8 @@ Widget::Widget(QWidget *parent)
 
     connect(m_player, &AVPlayer::AVPtsChanged, this, &Widget::ptsChangedSlot);
 
+    connect(m_player, &AVPlayer::AVTerminate, this, &Widget::terminateSlot, Qt::QueuedConnection);
+
     connect(ui->slider_volume, &QSlider::valueChanged, this, &Widget::setVolume);
 }
 
@@ -86,7 +88,7 @@ void Widget::InitUI()
     ui->label_pts->setAlignment(Qt::AlignCenter);
     ui->label_duration->setAlignment(Qt::AlignCenter);
     ui->label_volume->setAlignment(Qt::AlignCenter);
-    ui->lineEdit_input->setText("D:/QTProject/MediaPlayer/02test.mp4");
+    ui->lineEdit_input->setText("D:/QTProject/MediaPlayer/test.mp4");
 
     ui->slider_AVPts->setEnabled(false);
     ui->slider_AVPts->setMaximum(100);
@@ -145,7 +147,15 @@ void Widget::durationChangedSlot(unsigned int duration)
 
 void Widget::terminateSlot()
 {
-
+    ui->label_pts->setText(QString("00:00"));
+    ui->label_duration->setText(QString("00:00"));
+    ui->slider_AVPts->setEnabled(false);
+    ui->slider_AVPts->setValue(0);
+    ui->btn_forward->setEnabled(false);
+    ui->btn_back->setEnabled(false);
+    ui->btn_pauseon->setEnabled(false);
+    ui->btn_play->setEnabled(true);
+    m_player->clearPlayer();
 }
 
 void Widget::ptsSliderPressedSlot()
