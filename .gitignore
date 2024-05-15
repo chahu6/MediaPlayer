@@ -6,5 +6,9 @@ build/*
 # vs
 .vs
 
-# Qt Creator
-SRE.pro.user*
+# usr configurations
+*.usr
+*.user
+*.pro.user.*
+*.orig
+*.autosave
