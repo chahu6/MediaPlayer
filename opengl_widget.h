@@ -22,11 +22,12 @@ protected:
     virtual void initializeGL() Q_DECL_OVERRIDE;
     virtual void resizeGL(int w, int h) Q_DECL_OVERRIDE;
     virtual void paintGL() Q_DECL_OVERRIDE;
-    virtual void mouseReleaseEvent(QMouseEvent *event);
-    virtual void mouseDoubleClickEvent(QMouseEvent *event);
+    virtual void mouseReleaseEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
+    virtual void mouseDoubleClickEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
 
 signals:
     void mouseClicked();
+    void mouseDoubleClicked();
 
 public slots:
     void onShowYUV(QSharedPointer<YUV422Frame> frame);

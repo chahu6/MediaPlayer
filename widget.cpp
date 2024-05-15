@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QPainter>
-#include "AVPlayer.h"
+#include "AVPlayer.h" // 不知道为什么报错，但是不影响运行
 #include "YUV422Frame.h"
 
 Q_DECLARE_METATYPE(QSharedPointer<YUV422Frame>)
@@ -28,6 +28,11 @@ Widget::Widget(QWidget *parent)
      * 那么槽函数的调用不会立即执行，而是会被放入接收对象（即槽函数所属的对象）所在线程的事件队列中，等待事件循环下一次迭代时执行。
     */
     connect(m_player, &AVPlayer::frameChanged, ui->opengl_widget, &OpenGLWidget::onShowYUV, Qt::QueuedConnection);
+    connect(m_player, &AVPlayer::AVDurationChanged, this, &Widget::durationChangedSlot);
+    connect(m_player, &AVPlayer::AVPtsChanged, this, &Widget::ptsChangedSlot);
+    connect(m_player, &AVPlayer::AVTerminate, this, &Widget::terminateSlot, Qt::QueuedConnection);
+
+    connect(ui->slider_volume, &QSlider::valueChanged, this, &Widget::setVolume);
 
     connect(ui->btn_pauseon, &QPushButton::clicked, this, &Widget::pauseOnBtnClickSlot);
 
@@ -48,13 +53,26 @@ Widget::Widget(QWidget *parent)
         }
     });
 
-    connect(m_player, &AVPlayer::AVDurationChanged, this, &Widget::durationChangedSlot);
+    connect(ui->btn_forward, &QPushButton::clicked, this, &Widget::seekForwardSlot);
 
-    connect(m_player, &AVPlayer::AVPtsChanged, this, &Widget::ptsChangedSlot);
+    connect(ui->btn_back, &QPushButton::clicked, this, &Widget::seekBackSlot);
 
-    connect(m_player, &AVPlayer::AVTerminate, this, &Widget::terminateSlot, Qt::QueuedConnection);
+    connect(ui->slider_AVPts, &AVPtsSlider::sliderPressed, this, &Widget::ptsSliderPressedSlot);
+    connect(ui->slider_AVPts, &AVPtsSlider::sliderMoved, this, &Widget::ptsSliderMovedSlot);
+    connect(ui->slider_AVPts, &AVPtsSlider::sliderReleased, this, &Widget::ptsSliderReleaseSlot);
 
-    connect(ui->slider_volume, &QSlider::valueChanged, this, &Widget::setVolume);
+    connect(ui->opengl_widget, &OpenGLWidget::mouseDoubleClicked, [&]()
+    {
+        if(this->isMaximized())
+        {
+            this->showNormal();
+        }
+        else
+        {
+            showMaximized();
+        }
+    });
+    connect(ui->opengl_widget, &OpenGLWidget::mouseClicked, this, &Widget::pauseOnBtnClickSlot);
 }
 
 Widget::~Widget()

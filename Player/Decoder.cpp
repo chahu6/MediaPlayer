@@ -13,6 +13,7 @@ AVTool::Decoder::Decoder()
       m_duration(0)
 {
     init();
+    setInitVal(); // 初始化数据, 这里必须初始化，不然销毁时，size会有随机值，不是0
 }
 
 AVTool::Decoder::~Decoder()
@@ -180,6 +181,8 @@ void AVTool::Decoder::init()
 
 void AVTool::Decoder::exit()
 {
+    if(m_exit.load()) return;
+
     m_exit.store(true);
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 

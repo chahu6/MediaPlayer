@@ -264,10 +264,18 @@ void OpenGLWidget::onShowYUV(QSharedPointer<YUV422Frame> frame)
 
 void OpenGLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    Q_UNUSED(event)
 
+    if(!m_timer.isActive())
+    {
+        m_timer.start();
+    }
 }
 
 void OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
+    Q_UNUSED(event)
 
+    m_isDoubleClick = 1;
+    emit mouseDoubleClicked();
 }
