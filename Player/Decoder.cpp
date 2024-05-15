@@ -506,12 +506,12 @@ int AVTool::Decoder::getAFrame(AVFrame *frame)
     }
     if(m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].serial != m_audioPacketQueue.serial) {
         av_frame_unref(&m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
-        m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+        m_audioFrameQueue.readIndex = (m_audioFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
         m_audioFrameQueue.size--;
         return 0;
     }
     av_frame_move_ref(frame, &m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
-    m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+    m_audioFrameQueue.readIndex = (m_audioFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
     m_audioFrameQueue.size--;
     return 1;
 }

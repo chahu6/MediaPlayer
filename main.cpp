@@ -46,6 +46,13 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
+    // 设置样式
+    QFile qssFile(":/res/QSS/widget.qss");
+    if(qssFile.open(QFile::ReadOnly))
+    {
+        a.setStyleSheet(qssFile.readAll());
+    }
+
     // 初始化日志库，必须在QApplication初始化之后，不然QApplication::applicationDirPath()没有值
     QString logDir = QApplication::applicationDirPath() + "/logs";
     initLogger(logDir);
