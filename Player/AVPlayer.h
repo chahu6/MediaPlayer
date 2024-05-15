@@ -133,6 +133,7 @@ private:
 
     int m_imageWidth;
     int m_imageHeight;
+    float m_aspectRatio = 1; // 宽高比
 
     //终止标志
     int m_exit;
@@ -162,6 +163,7 @@ signals:
 public:
     inline void setVolume(int volumePer) { m_volume = (volumePer * SDL_MIX_MAXVOLUME / 100) % (SDL_MIX_MAXVOLUME + 1); };
     inline int getVolume() const { return m_volume; }
+    inline float getAspectRatio() const { return m_aspectRatio; }
 };
 
 #endif // AVPLAYER_H

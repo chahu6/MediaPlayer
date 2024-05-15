@@ -25,7 +25,11 @@ AVPlayer::AVPlayer(QObject *parent)
 
 AVPlayer::~AVPlayer()
 {
-    av_frame_free(&m_audioFrame);
+    if(m_audioFrame)
+    {
+        av_frame_free(&m_audioFrame);
+    }
+
     clearPlayer();
     if(m_decoder)
     {
@@ -40,6 +44,30 @@ AVPlayer::~AVPlayer()
         av_free(m_audioBuf);
     if(m_buffer)
         av_free(m_buffer);
+}
+
+void AVPlayer::clearPlayer()
+{
+    if(playeState() != AV_STOPPED)
+    {
+        m_exit = 1;
+        if(playeState() == AV_PLAYING)
+        {
+            SDL_PauseAudio(1);
+        }
+        m_decoder->exit();
+        SDL_CloseAudio();
+        if(m_swrCtx)
+        {
+            swr_free(&m_swrCtx);
+        }
+        if(m_swsCtx)
+        {
+            sws_freeContext(m_swsCtx);
+        }
+        m_swrCtx = nullptr;
+        m_swsCtx = nullptr;
+    }
 }
 
 bool AVPlayer::play(const QString &url)
@@ -217,29 +245,6 @@ AVPlayer::EPlayerState AVPlayer::playeState()
     return state;
 }
 
-void AVPlayer::clearPlayer()
-{
-    if(playeState() != AV_STOPPED)
-    {
-        if(playeState() == AV_PLAYING)
-        {
-            SDL_PauseAudio(1);
-        }
-        m_decoder->exit();
-        SDL_CloseAudio();
-        if(m_swsCtx)
-        {
-            swr_free(&m_swrCtx);
-        }
-        if(m_swsCtx)
-        {
-            sws_freeContext(m_swsCtx);
-        }
-        m_swrCtx = nullptr;
-        m_swsCtx = nullptr;
-    }
-}
-
 int AVPlayer::initSDL()
 {
     if(SDL_Init(SDL_INIT_AUDIO) != 0)
@@ -290,11 +295,12 @@ void AVPlayer::initVideo()
     m_videoCodecPar=m_decoder->videoCodecPar();
     m_videoIndex=m_decoder->videoIndex();
 
-    m_imageWidth=m_videoCodecPar->width;
-    m_imageHeight=m_videoCodecPar->height;
+    m_imageWidth = m_videoCodecPar->width;
+    m_imageHeight = m_videoCodecPar->height;
+    m_aspectRatio = m_imageHeight != 0 && m_imageWidth != 0 ? static_cast<float>(m_imageWidth) / static_cast<float>(m_imageHeight) : 1.f;
 
     m_dstPixFmt = AV_PIX_FMT_YUV422P;
-    m_swsFlags=SWS_BICUBIC;
+    m_swsFlags = SWS_BICUBIC;
 
     // 创建输出视频帧对象以及分配相应的缓冲区
     // 分配存储转换后帧数据的buffer内存

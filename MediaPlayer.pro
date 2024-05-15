@@ -44,3 +44,6 @@ win32: LIBS += -L$$PWD/3rdparty/ffmpeg-64bit/lib -lavcodec -lavdevice -lavfilter
 INCLUDEPATH += $$PWD/3rdparty/SDL2-2.26.5/include
 win32: LIBS += -L$$PWD/3rdparty/SDL2-2.26.5/lib/x64 -lSDL2 #-lSDL2main # -lSDL2test 这个库应该不用吧
 unix: LIBS += -L$$PWD/3rdparty/SDL2-2.26.5/lib/x64 -lSDL2
+
+# Eigen
+INCLUDEPATH += $$PWD/3rdparty/eigen-3.4.0

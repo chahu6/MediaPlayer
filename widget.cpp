@@ -43,6 +43,7 @@ Widget::Widget(QWidget *parent)
                 ui->btn_forward->setEnabled(true);
                 ui->btn_back->setEnabled(true);
                 ui->btn_pauseon->setEnabled(true);
+                ui->btn_play->setEnabled(false);
             }
         }
     });

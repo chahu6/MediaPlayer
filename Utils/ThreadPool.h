@@ -69,7 +69,7 @@ private:
                     Task task;
                     {
                         std::unique_lock<std::mutex> cv_mt(cv_mt_);
-                        this->cv_lock_.wait(cv_mt, [this]
+                        this->cv_lock_.wait(cv_mt, [this]()
                         {
                             return this->stop_.load() || !this->tasks_.empty();
                         });

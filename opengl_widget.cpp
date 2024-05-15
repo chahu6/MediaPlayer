@@ -7,14 +7,16 @@
 
 const char* vshadersrc = R"(
     #version 450 core
-    layout(location = 0) in vec4 vertexIn;
+    layout(location = 0) in vec2 vertexIn;
     layout(location = 1) in vec2 textureIn;
 
     layout(location = 0) out vec2 textureOut;
 
+    uniform mat4 transform;
+
     void main(void)
     {
-        gl_Position = vertexIn;
+        gl_Position = transform * vec4(vertexIn, 0.0, 1.0);
         textureOut = textureIn;
     }
 )";
@@ -45,7 +47,8 @@ const char* fshadersrc = R"(
 
 OpenGLWidget::OpenGLWidget(QWidget *parent)
     :QOpenGLWidget(parent),
-    m_isDoubleClick(0)
+    m_isDoubleClick(0),
+    m_transform(Eigen::Matrix4f::Identity())
 {
     connect(&m_timer, &QTimer::timeout, [this]()
     {
@@ -61,12 +64,18 @@ OpenGLWidget::OpenGLWidget(QWidget *parent)
 
 OpenGLWidget::~OpenGLWidget()
 {
-
+    makeCurrent();
+    vbo.destroy();
+    textureY->destroy();
+    textureU->destroy();
+    textureV->destroy();
+    doneCurrent();
 }
 
 void OpenGLWidget::initializeGL()
 {
     initializeOpenGLFunctions();
+    glClearColor(0.180, 0.180, 0.212, 0.0);
     glEnable(GL_DEPTH_TEST);
 
     static const GLfloat vertices[]{
@@ -119,6 +128,7 @@ void OpenGLWidget::initializeGL()
     posUniformY = program->uniformLocation("tex_y");
     posUniformU = program->uniformLocation("tex_u");
     posUniformV = program->uniformLocation("tex_v");
+    posUniformTransform = program->uniformLocation("transform");
 
     // 创建纹理并且获取ID
     textureY = new QOpenGLTexture(QOpenGLTexture::Target2D);
@@ -130,18 +140,19 @@ void OpenGLWidget::initializeGL()
     m_idY = textureY->textureId();
     m_idU = textureU->textureId();
     m_idV = textureV->textureId();
+}
 
-    glClearColor(0.0,0.0,0.0,0.0);
+void OpenGLWidget::resizeGL(int w, int h)
+{
+    if(h == 0) return;
+
+    m_dest_w = w;
+    m_dest_h = h;
+    m_dest_aspect_ratio = static_cast<float>(w) / static_cast<float>(h);
 }
 
 void OpenGLWidget::paintGL()
 {
-    // 激活纹理单元GL_TEXTURE0, 系统里面的
-    glActiveTexture(GL_TEXTURE0);
-
-    // 绑定y分量纹理对象ID到激活的纹理单元
-    glBindTexture(GL_TEXTURE_2D, m_idY);
-
     ///------------------------
     /// glTexImage2D(
     /// GLenum target,
@@ -169,13 +180,33 @@ void OpenGLWidget::paintGL()
     或者，直接在生成纹理之后调用glGenerateMipmap。这会为当前绑定的纹理自动生成所有需要的多级渐远纹理。
     */
 
-    if(m_frame.isNull())
-        return;
-    uint32_t videoW=m_frame->getPixelW();
-    uint32_t videoH=m_frame->getPixelH();
+    if(m_frame.isNull()) return;
 
+    // 画面保持比例缩放
+    uint32_t videoW = m_frame->getPixelW();
+    uint32_t videoH = m_frame->getPixelH();
+
+    m_src_aspect_ratio = (float)videoW / (float)videoH;
+
+    if(m_dest_aspect_ratio >= m_src_aspect_ratio)
+    {
+        float w = m_src_aspect_ratio * m_dest_h;
+        m_transform(0, 0) = w / m_dest_w;
+        m_transform(1, 1) = 1.f;
+    }
+    else
+    {
+        float h = m_dest_w / m_src_aspect_ratio;
+        m_transform(0, 0) = 1.f;
+        m_transform(1, 1) = h / m_dest_h;
+    }
+
+    // 激活纹理单元GL_TEXTURE0, 系统里面的
+    glActiveTexture(GL_TEXTURE0);
+    // 绑定y分量纹理对象ID到激活的纹理单元
+    glBindTexture(GL_TEXTURE_2D, m_idY);
     //使用内存中的数据创建真正的y分量纹理数据
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RED,videoW,videoH,0,GL_RED,GL_UNSIGNED_BYTE,m_frame->getBufY());//m_yPtr 大小是(videoW*videoH)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, videoW, videoH, 0, GL_RED, GL_UNSIGNED_BYTE, m_frame->getBufY());//m_yPtr 大小是(videoW*videoH)
     //https://blog.csdn.net/xipiaoyouzi/article/details/53584798 纹理参数解析
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
@@ -203,6 +234,9 @@ void OpenGLWidget::paintGL()
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // 计算比例缩放矩阵
+    glUniformMatrix4fv(posUniformTransform, 1, GL_FALSE, m_transform.data());
 
     //指定y纹理要使用新值
     glUniform1i(posUniformY, 0);

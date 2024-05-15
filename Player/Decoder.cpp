@@ -13,6 +13,7 @@ AVTool::Decoder::Decoder()
       m_duration(0)
 {
     init();
+    setInitVal();
 }
 
 AVTool::Decoder::~Decoder()
@@ -149,8 +150,6 @@ bool AVTool::Decoder::decode(const QString &url)
     // 记录视频帧率
     m_vidFrameRate = av_guess_frame_rate(m_pAvFormatCtx, m_pAvFormatCtx->streams[m_videoIndex], nullptr);
 
-    setInitVal();
-
     ThreadPool::instance().commit([this](){
         this->demux();
     });
@@ -182,17 +181,18 @@ void AVTool::Decoder::exit()
 {
     m_exit.store(true);
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
     clearQueueCache();
-    if(m_pAvFormatCtx)
+    if(m_pAvFormatCtx != nullptr)
     {
         avformat_close_input(&m_pAvFormatCtx);
         m_pAvFormatCtx = nullptr;
     }
-    if(m_audioPktDecoder.codecCtx) {
+    if(m_audioPktDecoder.codecCtx != nullptr) {
         avcodec_free_context(&m_audioPktDecoder.codecCtx);
         m_audioPktDecoder.codecCtx=nullptr;
     }
-    if(m_videoPktDecoder.codecCtx) {
+    if(m_videoPktDecoder.codecCtx != nullptr) {
         avcodec_free_context(&m_videoPktDecoder.codecCtx);
         m_videoPktDecoder.codecCtx=nullptr;
     }
@@ -220,7 +220,7 @@ void AVTool::Decoder::setInitVal()
     m_videoFrameQueue.pushIndex=0;
     m_videoFrameQueue.shown=0;
 
-    m_exit = 0;
+    m_exit.store(false);
 
     m_isSeek=0;
 
@@ -235,16 +235,19 @@ void AVTool::Decoder::clearQueueCache()
 {
     {
         std::lock_guard<std::mutex> lockAP(m_audioPacketQueue.mutex);
-        std::lock_guard<std::mutex> lockVP(m_videoPacketQueue.mutex);
 
-        while(m_audioPacketQueue.size)
+        while(m_audioPacketQueue.size > 0)
         {
             av_packet_unref(&m_audioPacketQueue.pktVec[m_audioPacketQueue.readIndex].pkt);
             m_audioPacketQueue.readIndex = (m_audioPacketQueue.readIndex + 1) % m_maxPacketQueueSize;
             m_audioPacketQueue.size--;
         }
+    }
 
-        while(m_videoPacketQueue.size)
+    {
+        std::lock_guard<std::mutex> lockVP(m_videoPacketQueue.mutex);
+
+        while(m_videoPacketQueue.size > 0)
         {
             av_packet_unref(&m_videoPacketQueue.pktVec[m_videoPacketQueue.readIndex].pkt);
             m_videoPacketQueue.readIndex = (m_videoPacketQueue.readIndex + 1) % m_maxPacketQueueSize;
@@ -254,17 +257,20 @@ void AVTool::Decoder::clearQueueCache()
 
     {
         std::lock_guard<std::mutex> lockAF(m_audioFrameQueue.mutex);
-        std::lock_guard<std::mutex> lockVF(m_videoFrameQueue.mutex);
 
-        while(m_audioFrameQueue.size) {
+        while(m_audioFrameQueue.size > 0) {
             av_frame_unref(&m_audioFrameQueue.frameVec[m_audioFrameQueue.readIndex].frame);
-            m_audioFrameQueue.readIndex=(m_audioFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+            m_audioFrameQueue.readIndex = (m_audioFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
             m_audioFrameQueue.size--;
         }
+    }
 
-        while(m_videoFrameQueue.size) {
+    {
+        std::lock_guard<std::mutex> lockVF(m_videoFrameQueue.mutex);
+
+        while(m_videoFrameQueue.size > 0) {
             av_frame_unref(&m_videoFrameQueue.frameVec[m_videoFrameQueue.readIndex].frame);
-            m_videoFrameQueue.readIndex=(m_videoFrameQueue.readIndex+1)%m_maxFrameQueueSize;
+            m_videoFrameQueue.readIndex = (m_videoFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
             m_videoFrameQueue.size--;
         }
     }
