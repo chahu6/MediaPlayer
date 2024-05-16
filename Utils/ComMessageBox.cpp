@@ -12,7 +12,7 @@ ComMessageBox::ComMessageBox(bool success, const QString& text, QWidget* parent)
     setWindowTitle("提示");
 
     setFixedSize(320, 120);
-    setStyleSheet(".ComMessageBox{background-color:rgb(255, 255, 255)}");
+    setStyleSheet(".ComMessageBox{background-color:rgb(46, 46, 54)}");
 
     QVBoxLayout* boxLayout = new QVBoxLayout(this);
     boxLayout->setContentsMargins(0, 0, 0, 0);

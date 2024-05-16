@@ -235,6 +235,19 @@ void AVTool::Decoder::setInitVal()
     m_videoPktDecoder.serial=0;
 }
 
+void AVTool::Decoder::packetQueueFlush(FPacketQueue *queue)
+{
+    std::lock_guard<std::mutex> lockAP(queue->mutex);
+
+    while(queue->size > 0)
+    {
+        av_packet_unref(&queue->pktVec[queue->readIndex].pkt);
+        queue->readIndex = (queue->readIndex + 1) % m_maxPacketQueueSize;
+        queue->size--;
+    }
+    queue->serial++;
+}
+
 void AVTool::Decoder::clearQueueCache()
 {
     {
@@ -295,7 +308,27 @@ void AVTool::Decoder::demux()
         }
         if(m_isSeek)
         {
+            //AVRational sq={1,AV_TIME_BASE};
+            //int64_t seekMin = m_seekRel > 0 ? m_seekTarget-m_seekRel+2 : INT64_MIN;
+            //int64_t seekMax = m_seekRel < 0 ? m_seekTarget-m_seekRel-2 : INT64_MAX;
+            //qDebug()<<"seekMin:"<<seekMin<<" seekMax:"<<seekMax<<" seekTarget:"<<m_seekTarget<<endl;
+            //ret=avformat_seek_file(m_fmtCtx,m_audioIndex,seekMin,m_seekTarget,seekMax,AVSEEK_FLAG_BACKWARD);
 
+            int64_t seekTarget = m_seekTarget * AV_TIME_BASE;
+            ret = av_seek_frame(m_pAvFormatCtx, -1, seekTarget, AVSEEK_FLAG_BACKWARD);
+            if(ret < 0)
+            {
+                av_strerror(ret, m_errBuf, sizeof(m_errBuf));
+                QLOG_ERROR() << "av_seek_frame error: " << m_errBuf;
+            }
+            else
+            {
+                packetQueueFlush(&m_audioPacketQueue);
+                packetQueueFlush(&m_videoPacketQueue);
+                m_audSeek = 1;
+                m_vidSeek = 1;
+            }
+            m_isSeek = 0;
         }
 
         // 读取音视频数据包进行解码处理
@@ -373,7 +406,16 @@ void AVTool::Decoder::audioDecode()
                 {
                     if(m_audSeek)
                     {
-
+                        int pts = (int)frame->pts * av_q2d(m_pAvFormatCtx->streams[m_audioIndex]->time_base);
+                        if(pts < m_seekTarget)
+                        {
+                            av_frame_unref(frame);
+                            continue;
+                        }
+                        else
+                        {
+                            m_audSeek = 0;
+                        }
                     }
                     // 添加到待播放视频帧队列
                     pushAFrame(frame);
@@ -424,7 +466,16 @@ void AVTool::Decoder::videoDecode()
                 {
                     if(m_vidSeek)
                     {
-
+                        int pts=(int)frame->pts*av_q2d(m_pAvFormatCtx->streams[m_videoIndex]->time_base);
+                        if(pts<m_seekTarget)
+                        {
+                            av_frame_unref(frame);
+                            continue;
+                        }
+                        else
+                        {
+                            m_vidSeek=0;
+                        }
                     }
                     // 添加到带播放视频帧队列
                     pushVFrame(frame);
@@ -585,4 +636,16 @@ void AVTool::Decoder::setNextVFrame()
     av_frame_unref(&m_videoFrameQueue.frameVec[m_videoFrameQueue.readIndex].frame);
     m_videoFrameQueue.readIndex = (m_videoFrameQueue.readIndex + 1) % m_maxFrameQueueSize;
     m_videoFrameQueue.size--;
+}
+
+void AVTool::Decoder::seekTo(int32_t target, int32_t seekRel)
+{
+    // 上次跳转未完成不处理跳转请求
+    if(m_isSeek == 1) return;
+
+    if(target < 0) target = 0;
+
+    m_seekTarget = target;
+    m_seekRel = seekRel; //@TODO 现在没什么用了
+    m_isSeek = 1;
 }

@@ -414,7 +414,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QSlider" name="slider_volume">
+      <widget class="SoundSlider" name="slider_volume">
        <property name="minimumSize">
         <size>
          <width>150</width>
@@ -459,6 +459,11 @@
    <class>OpenGLWidget</class>
    <extends>QOpenGLWidget</extends>
    <header>opengl_widget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>SoundSlider</class>
+   <extends>QSlider</extends>
+   <header>sound_slider.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

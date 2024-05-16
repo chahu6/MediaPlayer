@@ -2,7 +2,6 @@
 #define THREADPOOL_H
 
 #include "NoneCopy.h"
-#include <iostream>
 #include <thread>
 #include <future>
 #include <functional>
@@ -95,7 +94,6 @@ private:
         {
             if(td.joinable())
             {
-                std::cout << "join thread" << td.get_id() << std::endl;
                 td.join();
             }
         }

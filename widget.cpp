@@ -14,6 +14,7 @@ Widget::Widget(QWidget *parent)
     , m_vFmt("视频文件(*.mp4 *.mov *.avi *.mkv *.wmv *.flv *.webm *.mpeg *.mpg *.3gp *.m4v *.rmvb *.vob *.ts *.mts *.m2ts *.f4v *.divx *.xvid)")
     , m_duration(0)
     , m_ptsSliderPressed(false)
+    , m_seekTarget(0)
 {
     ui->setupUi(this);
     QString title = QString("%1 V%2 (64-bit, windows)").arg(QCoreApplication::applicationName()).arg(QCoreApplication::applicationVersion());
@@ -32,7 +33,7 @@ Widget::Widget(QWidget *parent)
     connect(m_player, &AVPlayer::AVPtsChanged, this, &Widget::ptsChangedSlot);
     connect(m_player, &AVPlayer::AVTerminate, this, &Widget::terminateSlot, Qt::QueuedConnection);
 
-    connect(ui->slider_volume, &QSlider::valueChanged, this, &Widget::setVolume);
+    connect(ui->slider_volume, &SoundSlider::volumeChanged, this, &Widget::setVolume);
 
     connect(ui->btn_pauseon, &QPushButton::clicked, this, &Widget::pauseOnBtnClickSlot);
 
@@ -86,7 +87,7 @@ void Widget::paintEvent(QPaintEvent *event)
 
     // 背景换个颜色
     QPainter painter(this);
-    painter.setBrush(QBrush(QColor(46,46,54)));
+    painter.setBrush(QBrush(QColor(46, 46, 54)));
     painter.drawRect(rect());
 }
 
@@ -97,7 +98,7 @@ void Widget::resizeEvent(QResizeEvent *event)
 
 void Widget::keyReleaseEvent(QKeyEvent *event)
 {
-    (void)event;
+    Q_UNUSED(event);
 }
 
 void Widget::InitUI()
@@ -106,10 +107,9 @@ void Widget::InitUI()
     ui->label_pts->setAlignment(Qt::AlignCenter);
     ui->label_duration->setAlignment(Qt::AlignCenter);
     ui->label_volume->setAlignment(Qt::AlignCenter);
-    ui->lineEdit_input->setText("D:/QTProject/MediaPlayer/test.mp4");
+    ui->lineEdit_input->setText("D:/QTProject/MediaPlayer/docs/02test.mp4");
 
     ui->slider_AVPts->setEnabled(false);
-    ui->slider_AVPts->setMaximum(100);
     ui->btn_forward->setEnabled(false);
     ui->btn_back->setEnabled(false);
     ui->btn_pauseon->setEnabled(false);
@@ -121,7 +121,7 @@ void Widget::InitUI()
 
 void Widget::pauseOnBtnClickSlot()
 {
-    switch (m_player->playeState())
+    switch (m_player->playState())
     {
         case AVPlayer::AV_PLAYING:
             m_player->pause(true);
@@ -172,31 +172,53 @@ void Widget::terminateSlot()
     ui->btn_forward->setEnabled(false);
     ui->btn_back->setEnabled(false);
     ui->btn_pauseon->setEnabled(false);
+    ui->btn_pauseon->setText(QString("暂停"));
     ui->btn_play->setEnabled(true);
     m_player->clearPlayer();
 }
 
 void Widget::ptsSliderPressedSlot()
 {
-
+    m_ptsSliderPressed = true;
+    m_seekTarget = (int)(ui->slider_AVPts->ptsPercent() * m_duration);
 }
 
-void Widget::ptsSliderMovedSlot()
+void Widget::ptsSliderMovedSlot(int position)
 {
+    Q_UNUSED(position)
 
+    m_seekTarget = (int)(ui->slider_AVPts->cursorXPercent() * m_duration);
+    const QString& ptsStr = QString("%1:%2").arg(m_seekTarget / 60, 2, 10, QLatin1Char('0')).arg(m_seekTarget % 60, 2, 10, QLatin1Char('0'));
+    if(m_ptsSliderPressed)
+    {
+        ui->label_pts->setText(ptsStr);
+    }
+    else
+    {
+        ui->slider_AVPts->setToolTip(ptsStr);
+    }
 }
 
 void Widget::ptsSliderReleaseSlot()
 {
-
+    m_player->seekTo(m_seekTarget);
+    m_ptsSliderPressed = false;
 }
 
 void Widget::seekForwardSlot()
 {
-
+    m_player->seekBy(6);
+    if(m_player->playState() == AVPlayer::AV_PAUSED)
+    {
+        m_player->pause(false);
+    }
 }
 
 void Widget::seekBackSlot()
 {
-
+    m_player->seekBy(-6);
+    if(m_player->playState() == AVPlayer::AV_PAUSED)
+    {
+        m_player->pause(false);
+    }
 }

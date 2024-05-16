@@ -48,10 +48,10 @@ AVPlayer::~AVPlayer()
 
 void AVPlayer::clearPlayer()
 {
-    if(playeState() != AV_STOPPED)
+    if(playState() != AV_STOPPED)
     {
         m_exit = 1;
-        if(playeState() == AV_PLAYING)
+        if(playState() == AV_PLAYING)
         {
             SDL_PauseAudio(1);
         }
@@ -70,6 +70,17 @@ void AVPlayer::clearPlayer()
     }
 }
 
+void AVPlayer::seekBy(int32_t time_s)
+{
+    seekTo((int32_t)m_audioClock.getClock() + time_s);
+}
+
+void AVPlayer::seekTo(int32_t time_s)
+{
+    if(time_s < 0) time_s = 0;
+    m_decoder->seekTo(time_s, time_s - (int32_t)m_audioClock.getClock());
+}
+
 bool AVPlayer::play(const QString &url)
 {
     QFileInfo fileInfo(url);
@@ -77,12 +88,14 @@ bool AVPlayer::play(const QString &url)
     if(suffix != "mp4" && suffix != "mp3")
     {
         ComMessageBox::error(NULL, QString("目前只支持: mp4、mp3文件类型"));
+        QLOG_INFO() << "文件格式不正确";
         return false;
     }
 
     clearPlayer();
     if(!m_decoder->decode(url))
     {
+        ComMessageBox::error(NULL, QString("文件无效，解析出错"));
         QLOG_INFO() << "decode failed";
         return false;
     }
@@ -224,7 +237,7 @@ void fillAStreamCallback(void* userData, uint8_t* stream, int len)
     }
 }
 
-AVPlayer::EPlayerState AVPlayer::playeState()
+AVPlayer::EPlayerState AVPlayer::playState()
 {
     AVPlayer::EPlayerState state;
     switch (SDL_GetAudioStatus())

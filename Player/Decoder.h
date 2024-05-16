@@ -77,10 +77,14 @@ namespace AVTool
         // 将读索引后移一位
         void setNextVFrame();
 
+        void seekTo(int32_t target,int32_t seekRel);
+
     private:
         void init();
 
         void setInitVal();
+
+        void packetQueueFlush(FPacketQueue* queue);
 
         void clearQueueCache();
 

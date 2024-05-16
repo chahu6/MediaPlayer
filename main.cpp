@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Chahu666");
     QCoreApplication::setOrganizationDomain("https://gitee.com/chahu666");
     QCoreApplication::setApplicationName("MediaPlayer");
-    QCoreApplication::setApplicationVersion("1.0");
+    QCoreApplication::setApplicationVersion("2.0");
 
     // 适配高分辨率
 #if(QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))

@@ -29,8 +29,8 @@ struct Utils
 
     static QString secondsToDurationStr(int seconds)
     {
-        int h = seconds/3600;
-        int m = (seconds%3600)/60;
+        int h = seconds / 3600;
+        int m = (seconds % 3600) / 60;
         int s = seconds % 60;
 
         QString h_s;
@@ -44,15 +44,21 @@ struct Utils
         }
 
         QString m_s;
-        if(m<10){
+        if(m<10)
+        {
             m_s = QString("0%1").arg(m);
-        }else{
+        }
+        else
+        {
             m_s = QString::number(m);
         }
         QString s_s;
-        if(s<10){
+        if(s<10)
+        {
             s_s = QString("0%1").arg(s);
-        }else{
+        }
+        else
+        {
             s_s = QString::number(s);
         }
         QString durationStr = QString("%1:%2:%3").arg(h_s).arg(m_s).arg(s_s);

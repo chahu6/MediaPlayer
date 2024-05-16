@@ -30,8 +30,8 @@ public:
 
     inline void reset()
     {
-        m_pts=0.0;
-        m_drift=0.0;
+        m_pts = 0.0;
+        m_drift = 0.0;
     }
 
     inline void setClock(double pts) {
@@ -39,13 +39,13 @@ public:
     }
 
     inline double getClock() {
-        return m_drift+av_gettime_relative() / 1000000.0;
+        return m_drift + av_gettime_relative() / 1000000.0;
     }
 
 private:
     inline void setCloctAt(double pts) {
-        m_drift=pts-av_gettime_relative() / 1000000.0;
-        m_pts=pts;
+        m_drift = pts - av_gettime_relative() / 1000000.0;
+        m_pts = pts;
     }
 
     double m_pts;
@@ -72,9 +72,13 @@ public:
     bool play(const QString& url);
     void pause(bool isPause);
 
-    AVPlayer::EPlayerState playeState();
+    AVPlayer::EPlayerState playState();
 
     void clearPlayer();
+
+    void seekBy(int32_t time_s);
+
+    void seekTo(int32_t time_s);
 
 private:
     int initSDL();

@@ -38,6 +38,8 @@ private:
 
     bool m_ptsSliderPressed;
 
+    int m_seekTarget;
+
 private Q_SLOTS:
     void pauseOnBtnClickSlot();
 
@@ -53,7 +55,7 @@ private Q_SLOTS:
 
     void ptsSliderPressedSlot();
 
-    void ptsSliderMovedSlot();
+    void ptsSliderMovedSlot(int position);
 
     void ptsSliderReleaseSlot();
 
