@@ -35,10 +35,12 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 # ffmpeg
 INCLUDEPATH += $$PWD/3rdparty/ffmpeg-64bit/include
+DEPENDPATH += $$PWD/3rdparty/ffmpeg-64bit/include
 win32: LIBS += -L$$PWD/3rdparty/ffmpeg-64bit/lib -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lpostproc -lswresample -lswscale
 
 # SLD2
 INCLUDEPATH += $$PWD/3rdparty/SDL2-2.26.5/include
+DEPENDPATH += $$PWD/3rdparty/SDL2-2.26.5/include
 win32: LIBS += -L$$PWD/3rdparty/SDL2-2.26.5/lib/x64 -lSDL2 #-lSDL2main # -lSDL2test 这个库应该不用吧
 unix: LIBS += -L$$PWD/3rdparty/SDL2-2.26.5/lib/x64 -lSDL2
 
